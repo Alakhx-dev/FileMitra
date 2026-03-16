@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { FileUploader } from './components/FileUploader';
+import { ImageEditor } from './components/ImageEditor';
 import { cn } from './utils';
 import { 
   mergeFiles, 
@@ -37,7 +38,7 @@ import {
 import confetti from 'canvas-confetti';
 
 type WorkflowStep = 'idle' | 'toolSelected' | 'configuring' | 'processing' | 'result';
-type ActionType = 'convert' | 'compress' | 'merge' | 'resize' | null;
+type ActionType = 'convert' | 'compress' | 'merge' | 'resize' | 'image' | null;
 
 const FloatingIcons = () => {
   const icons = [FileText, ImageIcon, FileArchive, Layers];
@@ -107,7 +108,7 @@ const AppContent = () => {
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles(files);
-    if (activeAction === 'convert' || activeAction === 'compress') {
+    if (activeAction === 'convert' || activeAction === 'compress' || activeAction === 'image') {
       if (files.length > 0) {
         setOriginalFileSize(files[0].size);
       }
@@ -539,6 +540,21 @@ const AppContent = () => {
                     Compress Now
                   </button>
                 </div>
+              ) : activeAction === 'image' ? (
+                /* ── Image Tools (Editor) Panel ── */
+                <ImageEditor 
+                  file={selectedFiles[0]} 
+                  onResult={(res) => {
+                    setResult(res);
+                    setStep('result');
+                    confetti({
+                      particleCount: 150,
+                      spread: 100,
+                      origin: { y: 0.6 },
+                      colors: ['#6366f1', '#a855f7', '#ec4899']
+                    });
+                  }} 
+                />
               ) : (
                 /* ── Convert Configuration Panel (existing) ── */
                 <div className="glass-card p-6 md:p-16 space-y-8 md:space-y-12">
