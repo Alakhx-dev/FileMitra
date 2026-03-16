@@ -111,11 +111,11 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
   const text = await file.text();
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  
+
   const fontSize = 12;
   const margin = 50;
   const lineHeight = 15;
-  
+
   // Normalize line endings and sanitize text for WinAnsi encoding
   const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\t/g, '    ');
   const sanitizedText = normalizedText.replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '?');
@@ -167,7 +167,7 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
       });
       cursorY -= lineHeight;
     }
-    
+
     // Add extra space between paragraphs
     cursorY -= lineHeight / 2;
   }
@@ -187,19 +187,19 @@ export const docxToPDF = async (file: File): Promise<ProcessingResult> => {
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   const text = result.value;
-  
+
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  
+
   const fontSize = 12;
   const margin = 50;
   const lineHeight = 15;
-  
+
   // Normalize line endings and sanitize text
   const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\t/g, '    ');
   const sanitizedText = normalizedText.replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '?');
   const paragraphs = sanitizedText.split('\n');
-  
+
   let page = pdfDoc.addPage();
   let { width, height } = page.getSize();
   let cursorY = height - margin;
@@ -271,7 +271,7 @@ export const createZip = async (files: File[]): Promise<ProcessingResult> => {
   };
 };
 
-export const compressImageClient = async (file: File, quality: number): Promise<ProcessingResult> => {
+export const compressImageClient = async (file: File, sliderValue: number): Promise<ProcessingResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -279,28 +279,67 @@ export const compressImageClient = async (file: File, quality: number): Promise<
       const img = new Image();
       img.src = event.target?.result as string;
       img.onload = () => {
+        // Slider = compression amount: higher slider → more compression → lower quality
+        // Slider 10 → quality 0.9 (light), Slider 50 → 0.5, Slider 80 → 0.2
+        let canvasQuality = 1 - (sliderValue / 100);
+        canvasQuality = Math.max(0.05, Math.min(0.95, canvasQuality)); // Clamp to safe range
+
+        // Downscale dimensions for heavy compression (slider >= 60)
+        let targetWidth = img.width;
+        let targetHeight = img.height;
+        if (sliderValue >= 60) {
+          // Scale from 90% down to 70% as slider goes 60→100
+          const scaleFactor = 0.9 - ((sliderValue - 60) / 40) * 0.2; // 0.9 → 0.7
+          targetWidth = Math.round(img.width * scaleFactor);
+          targetHeight = Math.round(img.height * scaleFactor);
+        }
+
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
         const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0);
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve({
-                blob,
-                filename: `compressed_${file.name}`,
-              });
-            } else {
-              reject(new Error('Canvas toBlob failed'));
-            }
-          },
-          file.type,
-          quality / 100
-        );
+        if (!ctx) { reject(new Error('Canvas context failed')); return; }
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+        // PNG: canvas.toBlob ignores quality for image/png (always lossless)
+        // So for any meaningful compression, convert PNG to JPEG when slider >= 40
+        const isOriginalPng = file.type === 'image/png';
+        const outputMime = (isOriginalPng && sliderValue < 40) ? 'image/png' : 'image/jpeg';
+        const ext = outputMime === 'image/png' ? 'png' : 'jpg';
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+
+        // Try compression, retry with lower quality if output is still larger
+        const tryCompress = (q: number) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { reject(new Error('Canvas toBlob failed')); return; }
+
+              if (blob.size >= file.size && q > 0.1) {
+                // Output is larger — retry with lower quality
+                tryCompress(q - 0.1);
+              } else if (blob.size >= file.size) {
+                // Even at minimum quality it's larger — return original
+                resolve({
+                  blob: file,
+                  filename: file.name,
+                });
+              } else {
+                resolve({
+                  blob,
+                  filename: `compressed_${baseName}.${ext}`,
+                });
+              }
+            },
+            outputMime,
+            q
+          );
+        };
+
+        tryCompress(canvasQuality);
       };
+      img.onerror = () => reject(new Error('Failed to load image'));
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = () => reject(new Error('Failed to read file'));
   });
 };
 
@@ -350,7 +389,7 @@ export const convertImage = async (file: File, format: string): Promise<Processi
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0);
-        
+
         const mimeType = `image/${format.toLowerCase()}`;
         canvas.toBlob(
           (blob) => {

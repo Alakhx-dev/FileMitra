@@ -154,4 +154,52 @@
   animation: pulse-glow 8s ease-in-out infinite;
 }
 
+/* Custom Compress Slider */
+.compress-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.3), rgba(99, 102, 241, 0.3), rgba(16, 185, 129, 0.3));
+  outline: none;
+  cursor: pointer;
+}
 
+.compress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.compress-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.7), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.compress-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+
+.compress-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.compress-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.3), rgba(99, 102, 241, 0.3), rgba(16, 185, 129, 0.3));
+}

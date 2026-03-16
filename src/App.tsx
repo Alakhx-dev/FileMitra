@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, 
@@ -16,7 +16,9 @@ import {
   Download,
   Zap,
   Shield,
-  Smartphone
+  Smartphone,
+  TrendingDown,
+  Info
 } from 'lucide-react';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { FileUploader } from './components/FileUploader';
@@ -76,6 +78,7 @@ const AppContent = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<{ blob: Blob; filename: string } | null>(null);
   const [quality, setQuality] = useState(80);
+  const [originalFileSize, setOriginalFileSize] = useState(0);
 
   const getFileCategory = (file: File) => {
     if (file.type.startsWith('image/')) return 'image';
@@ -104,10 +107,31 @@ const AppContent = () => {
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles(files);
-    if (activeAction === 'convert') {
+    if (activeAction === 'convert' || activeAction === 'compress') {
+      if (files.length > 0) {
+        setOriginalFileSize(files[0].size);
+      }
       setStep('configuring');
     }
   };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const estimatedSize = useMemo(() => {
+    if (selectedFiles.length === 0 || originalFileSize === 0) return 0;
+    // Match the actual compression: quality = 1 - (slider / 100)
+    const qualityFactor = 1 - (quality / 100);
+    // Downscaling kicks in at slider >= 60
+    const scaleFactor = quality >= 60 
+      ? (0.9 - ((quality - 60) / 40) * 0.2) ** 2  // area ratio of 0.9→0.7
+      : 1;
+    const estimated = Math.round(originalFileSize * Math.max(qualityFactor, 0.05) * scaleFactor);
+    return Math.min(estimated, originalFileSize);
+  }, [quality, originalFileSize, selectedFiles]);
 
   const handleActionSelect = (action: ActionType) => {
     setActiveAction(action);
@@ -427,43 +451,134 @@ const AppContent = () => {
                 </div>
               </div>
 
-              <div className="glass-card p-6 md:p-16 space-y-8 md:space-y-12">
-                <div className="text-center space-y-3 md:space-y-4">
-                  <h2 className="text-3xl md:text-5xl font-black tracking-tight">
-                    What do you want to convert this file to?
-                  </h2>
-                  <p className="text-base md:text-xl text-muted-foreground font-medium">
-                    Choose the format you want to convert to.
-                  </p>
-                </div>
-
-                <div className="space-y-8">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {getConversionOptions().map((format) => (
-                      <button
-                        key={format}
-                        onClick={() => setOutputFormat(format)}
-                        className={cn(
-                          "p-6 rounded-2xl border-2 transition-all font-black text-xl",
-                          outputFormat === format 
-                            ? "bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/30" 
-                            : "glass border-white/10 hover:border-white/30"
-                        )}
-                      >
-                        {format}
-                      </button>
-                    ))}
+              {activeAction === 'compress' ? (
+                /* ── Compress Configuration Panel ── */
+                <div className="glass-card p-6 md:p-16 space-y-8 md:space-y-10">
+                  <div className="text-center space-y-3 md:space-y-4">
+                    <h2 className="text-3xl md:text-5xl font-black tracking-tight">
+                      Compression Settings
+                    </h2>
+                    <p className="text-base md:text-xl text-muted-foreground font-medium">
+                      Adjust quality to control the output file size.
+                    </p>
                   </div>
 
-                  <button
-                    disabled={!outputFormat}
-                    onClick={() => handleProcess()}
-                    className="w-full btn-primary py-4 md:py-6 text-xl md:text-2xl shadow-2xl disabled:opacity-50"
+                  {/* File Info Card */}
+                  <div className="glass p-5 md:p-6 rounded-2xl space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-linear-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center shrink-0">
+                        <Info className="w-6 h-6 md:w-7 md:h-7 text-orange-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-base md:text-lg truncate">{selectedFiles[0]?.name}</p>
+                        <div className="flex items-center space-x-3 mt-1">
+                          <span className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">
+                            {selectedFiles[0]?.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                          </span>
+                          <span className="w-1 h-1 rounded-full bg-white/20" />
+                          <span className="text-[10px] md:text-xs uppercase tracking-widest font-black text-brand-primary">
+                            {formatSize(originalFileSize)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quality Slider */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm md:text-base font-bold opacity-70">Compression Level</span>
+                      <span className="text-2xl md:text-3xl font-black text-brand-primary">{quality}%</span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={quality}
+                      onChange={(e) => setQuality(Number(e.target.value))}
+                      className="compress-slider w-full"
+                    />
+
+                    <div className="flex justify-between text-xs md:text-sm font-bold">
+                      <span className="text-emerald-400 opacity-70">Higher Quality</span>
+                      <span className="text-red-400 opacity-70">Smaller File Size</span>
+                    </div>
+                  </div>
+
+                  {/* Size Comparison */}
+                  <motion.div 
+                    className="glass p-5 md:p-6 rounded-2xl"
+                    animate={{ scale: [1, 1.01, 1] }}
+                    transition={{ duration: 0.3 }}
+                    key={quality}
                   >
-                    Convert to {outputFormat || '...'}
+                    <div className="grid grid-cols-2 gap-6 text-center">
+                      <div className="space-y-2">
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">Original Size</p>
+                        <p className="text-xl md:text-2xl font-black">{formatSize(originalFileSize)}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">Estimated Size</p>
+                        <p className="text-xl md:text-2xl font-black text-brand-primary">{formatSize(estimatedSize)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-white/10 text-center">
+                      <p className="text-sm font-bold opacity-60">
+                        Estimated reduction: <span className="text-brand-accent">{originalFileSize > 0 ? Math.round((1 - estimatedSize / originalFileSize) * 100) : 0}%</span>
+                      </p>
+                    </div>
+                  </motion.div>
+
+                  {/* Compress Button */}
+                  <button
+                    onClick={() => handleProcess()}
+                    className="w-full btn-primary py-4 md:py-6 text-xl md:text-2xl shadow-2xl"
+                  >
+                    <Minimize2 className="w-6 h-6 mr-3" />
+                    Compress Now
                   </button>
                 </div>
-              </div>
+              ) : (
+                /* ── Convert Configuration Panel (existing) ── */
+                <div className="glass-card p-6 md:p-16 space-y-8 md:space-y-12">
+                  <div className="text-center space-y-3 md:space-y-4">
+                    <h2 className="text-3xl md:text-5xl font-black tracking-tight">
+                      What do you want to convert this file to?
+                    </h2>
+                    <p className="text-base md:text-xl text-muted-foreground font-medium">
+                      Choose the format you want to convert to.
+                    </p>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {getConversionOptions().map((format) => (
+                        <button
+                          key={format}
+                          onClick={() => setOutputFormat(format)}
+                          className={cn(
+                            "p-6 rounded-2xl border-2 transition-all font-black text-xl",
+                            outputFormat === format 
+                              ? "bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/30" 
+                              : "glass border-white/10 hover:border-white/30"
+                          )}
+                        >
+                          {format}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      disabled={!outputFormat}
+                      onClick={() => handleProcess()}
+                      className="w-full btn-primary py-4 md:py-6 text-xl md:text-2xl shadow-2xl disabled:opacity-50"
+                    >
+                      Convert to {outputFormat || '...'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : step === 'result' && result ? (
             <motion.div
@@ -481,6 +596,41 @@ const AppContent = () => {
                   <h3 className="text-5xl font-black tracking-tight">File Ready!</h3>
                   <p className="text-xl text-muted-foreground font-medium">Your smart assistant has finished the job.</p>
                 </div>
+
+                {/* Compression Stats — only for compress action */}
+                {activeAction === 'compress' && originalFileSize > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="glass p-6 md:p-8 rounded-3xl max-w-xl mx-auto space-y-6"
+                  >
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="space-y-2">
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">Original</p>
+                        <p className="text-lg md:text-2xl font-black">{formatSize(originalFileSize)}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">Compressed</p>
+                        <p className="text-lg md:text-2xl font-black text-brand-primary">{formatSize(result.blob.size)}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">Saved</p>
+                        <p className="text-lg md:text-2xl font-black text-emerald-400">
+                          {Math.max(0, Math.round((1 - result.blob.size / originalFileSize) * 100))}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden">
+                      <motion.div 
+                        className="h-full rounded-full bg-linear-to-r from-brand-primary to-emerald-400"
+                        initial={{ width: '100%' }}
+                        animate={{ width: `${Math.round((result.blob.size / originalFileSize) * 100)}%` }}
+                        transition={{ duration: 1.2, ease: 'easeOut', delay: 0.4 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
                 
                 <div className="glass p-6 md:p-8 rounded-3xl flex flex-col sm:flex-row items-center justify-between max-w-xl mx-auto border-emerald-500/20 gap-6">
                   <div className="flex items-center space-x-4 md:space-x-6 w-full sm:w-auto">
@@ -493,7 +643,7 @@ const AppContent = () => {
                     </div>
                     <div className="text-left min-w-0">
                       <p className="font-bold text-base md:text-lg truncate max-w-[150px] md:max-w-[200px]">{result.filename}</p>
-                      <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">{(result.blob.size / (1024 * 1024)).toFixed(2)} MB</p>
+                      <p className="text-[10px] md:text-xs uppercase tracking-widest font-black opacity-50">{formatSize(result.blob.size)}</p>
                     </div>
                   </div>
                   <button onClick={downloadResult} className="w-full sm:w-auto p-4 bg-brand-primary rounded-2xl hover:scale-105 transition-all shadow-xl shadow-brand-primary/30 flex items-center justify-center space-x-2">
@@ -504,7 +654,7 @@ const AppContent = () => {
 
                 <div className="pt-6">
                   <button 
-                    onClick={() => { setStep('idle'); setSelectedFiles([]); setResult(null); setOutputFormat(''); }}
+                    onClick={() => { setStep('idle'); setSelectedFiles([]); setResult(null); setOutputFormat(''); setOriginalFileSize(0); }}
                     className="text-brand-primary font-bold text-lg hover:underline decoration-2 underline-offset-8"
                   >
                     Process another file
