@@ -38,21 +38,21 @@
 
 /* ─── Light Theme Variables ─── */
 :root {
-  --bg-page: #f5f6fb;
-  --bg-gradient: linear-gradient(180deg, #f5f6fb 0%, #ffffff 40%, #f3f4fa 100%);
+  --bg-page: #eef1f7;
+  --bg-gradient: linear-gradient(180deg, #eef1f7 0%, #ffffff 40%, #f1f3f9 100%);
   --text-page: #0f172a;
   --text-secondary: #475569;
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --glass-card-bg: rgba(255, 255, 255, 0.75);
-  --glass-card-border: rgba(0, 0, 0, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-card-bg: rgba(255, 255, 255, 0.85);
+  --glass-card-border: rgba(0, 0, 0, 0.06);
   --glass-card-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-  --glass-card-hover-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(120, 120, 255, 0.15);
+  --glass-card-hover-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
   --glass-card-hover-border: rgba(120, 120, 255, 0.25);
   --muted-fg: #475569;
-  --btn-primary-shadow: 0 10px 25px rgba(120, 100, 255, 0.35);
-  --btn-gradient: linear-gradient(135deg, #7c6cff, #a855f7);
-  --btn-gradient-hover: linear-gradient(135deg, #8d7fff, #b66af8);
+  --btn-primary-shadow: 0 8px 20px rgba(108, 99, 255, 0.35);
+  --btn-gradient: linear-gradient(135deg, #6c63ff, #9d4edd);
+  --btn-gradient-hover: linear-gradient(135deg, #7c73ff, #a860f0);
 }
 
 /* ─── Dark Theme Variables ─── */
