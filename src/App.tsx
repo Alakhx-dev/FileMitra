@@ -293,17 +293,7 @@ const AppContent = () => {
                   with lightning speed and premium precision.
                 </motion.p>
 
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-                  className="max-w-xl mx-auto pt-8"
-                >
-                  <FileUploader 
-                    onFilesSelected={handleFilesSelected} 
-                    multiple={true}
-                  />
-                </motion.div>
+
               </div>
 
               {/* Feature Grid */}

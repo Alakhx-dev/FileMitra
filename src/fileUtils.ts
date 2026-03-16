@@ -1,7 +1,5 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import JSZip from 'jszip';
-import mammoth from 'mammoth';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+// Heavy libraries (pdf-lib, jszip, mammoth, docx) are loaded lazily via dynamic import()
+// so they don't block the main thread or slow down the file picker interaction.
 
 export interface ProcessingResult {
   blob: Blob;
@@ -9,6 +7,7 @@ export interface ProcessingResult {
 }
 
 export const mergePDFs = async (files: File[]): Promise<ProcessingResult> => {
+  const { PDFDocument } = await import('pdf-lib');
   const mergedPdf = await PDFDocument.create();
   for (const file of files) {
     const pdfBytes = await file.arrayBuffer();
@@ -24,6 +23,7 @@ export const mergePDFs = async (files: File[]): Promise<ProcessingResult> => {
 };
 
 export const imagesToPDF = async (files: File[]): Promise<ProcessingResult> => {
+  const { PDFDocument } = await import('pdf-lib');
   const pdfDoc = await PDFDocument.create();
   for (const file of files) {
     const imageBytes = await file.arrayBuffer();
@@ -52,6 +52,7 @@ export const imagesToPDF = async (files: File[]): Promise<ProcessingResult> => {
 };
 
 export const textToPDF = async (file: File): Promise<ProcessingResult> => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const text = await file.text();
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -61,7 +62,6 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
   const lineHeight = 15;
   
   // Normalize line endings and sanitize text for WinAnsi encoding
-  // StandardFonts.Helvetica only supports WinAnsi, which doesn't include \r (0x0d) or \t (0x09)
   const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\t/g, '    ');
   const sanitizedText = normalizedText.replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '?');
 
@@ -79,7 +79,6 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
       const textWidth = font.widthOfTextAtSize(testLine, fontSize);
 
       if (textWidth > width - (margin * 2)) {
-        // Draw current line and start a new one
         if (cursorY < margin + lineHeight) {
           page = pdfDoc.addPage();
           cursorY = height - margin;
@@ -126,11 +125,14 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
 };
 
 export const docxToPDF = async (file: File): Promise<ProcessingResult> => {
+  const [{ PDFDocument, rgb, StandardFonts }, mammoth] = await Promise.all([
+    import('pdf-lib'),
+    import('mammoth'),
+  ]);
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   const text = result.value;
   
-  // Reuse textToPDF logic but with the extracted text
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   
@@ -192,6 +194,7 @@ export const docxToPDF = async (file: File): Promise<ProcessingResult> => {
 };
 
 export const docxToText = async (file: File): Promise<ProcessingResult> => {
+  const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   return {
@@ -201,6 +204,7 @@ export const docxToText = async (file: File): Promise<ProcessingResult> => {
 };
 
 export const createZip = async (files: File[]): Promise<ProcessingResult> => {
+  const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
   files.forEach((file) => {
     zip.file(file.name, file);
