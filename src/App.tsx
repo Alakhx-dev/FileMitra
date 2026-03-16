@@ -223,7 +223,7 @@ const AppContent = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#050505] text-slate-900 dark:text-white selection:bg-brand-primary/30 font-sans">
+    <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-page)] selection:bg-brand-primary/30 font-sans transition-colors duration-350">
       {/* Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-brand-primary/10 rounded-full blur-[150px] animate-pulse" />
