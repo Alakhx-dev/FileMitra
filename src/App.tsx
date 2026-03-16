@@ -22,7 +22,7 @@ import { ThemeProvider, useTheme } from './ThemeContext';
 import { FileUploader } from './components/FileUploader';
 import { cn } from './utils';
 import { 
-  mergePDFs, 
+  mergeFiles, 
   imagesToPDF, 
   textToPDF, 
   docxToText, 
@@ -132,7 +132,7 @@ const AppContent = () => {
     try {
       let res;
       if (action === 'merge') {
-        res = await mergePDFs(selectedFiles);
+        res = await mergeFiles(selectedFiles);
       } else if (action === 'compress') {
         res = await compressImageClient(selectedFiles[0], quality);
       } else if (action === 'resize') {
@@ -172,7 +172,7 @@ const AppContent = () => {
     } catch (error) {
       console.error(error);
       alert('Processing failed. Please try again.');
-      setStep('options');
+      setStep('toolSelected');
     } finally {
       setIsProcessing(false);
     }

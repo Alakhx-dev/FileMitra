@@ -6,18 +6,73 @@ export interface ProcessingResult {
   filename: string;
 }
 
-export const mergePDFs = async (files: File[]): Promise<ProcessingResult> => {
+// Convert a WEBP image to PNG bytes via an offscreen canvas
+const webpToPngBytes = (file: File): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas context failed')); return; }
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (!blob) { reject(new Error('Canvas toBlob failed')); return; }
+          blob.arrayBuffer().then(resolve).catch(reject);
+        }, 'image/png');
+      };
+      img.onerror = () => reject(new Error('Failed to load WEBP image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read WEBP file'));
+    reader.readAsDataURL(file);
+  });
+};
+
+export const mergeFiles = async (files: File[]): Promise<ProcessingResult> => {
   const { PDFDocument } = await import('pdf-lib');
   const mergedPdf = await PDFDocument.create();
+
   for (const file of files) {
-    const pdfBytes = await file.arrayBuffer();
-    const pdf = await PDFDocument.load(pdfBytes);
-    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-    copiedPages.forEach((page) => mergedPdf.addPage(page));
+    const fileType = file.type.toLowerCase();
+
+    if (fileType === 'application/pdf') {
+      // PDF: copy all pages into the merged document
+      const pdfBytes = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(pdfBytes);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+
+    } else if (fileType === 'image/jpeg' || fileType === 'image/jpg') {
+      const imageBytes = await file.arrayBuffer();
+      const image = await mergedPdf.embedJpg(imageBytes);
+      const page = mergedPdf.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+
+    } else if (fileType === 'image/png') {
+      const imageBytes = await file.arrayBuffer();
+      const image = await mergedPdf.embedPng(imageBytes);
+      const page = mergedPdf.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+
+    } else if (fileType === 'image/webp') {
+      // pdf-lib doesn't support WEBP natively — convert to PNG first
+      const pngBytes = await webpToPngBytes(file);
+      const image = await mergedPdf.embedPng(pngBytes);
+      const page = mergedPdf.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+
+    } else {
+      console.warn(`Skipping unsupported file type: ${file.type} (${file.name})`);
+    }
   }
+
   const pdfBytes = await mergedPdf.save();
   return {
-    blob: new Blob([pdfBytes], { type: 'application/pdf' }),
+    blob: new Blob([pdfBytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }),
     filename: 'merged.pdf',
   };
 };
@@ -46,7 +101,7 @@ export const imagesToPDF = async (files: File[]): Promise<ProcessingResult> => {
   }
   const pdfBytes = await pdfDoc.save();
   return {
-    blob: new Blob([pdfBytes], { type: 'application/pdf' }),
+    blob: new Blob([pdfBytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }),
     filename: 'images.pdf',
   };
 };
@@ -119,7 +174,7 @@ export const textToPDF = async (file: File): Promise<ProcessingResult> => {
 
   const pdfBytes = await pdfDoc.save();
   return {
-    blob: new Blob([pdfBytes], { type: 'application/pdf' }),
+    blob: new Blob([pdfBytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }),
     filename: `${file.name.split('.')[0]}.pdf`,
   };
 };
@@ -188,7 +243,7 @@ export const docxToPDF = async (file: File): Promise<ProcessingResult> => {
 
   const pdfBytes = await pdfDoc.save();
   return {
-    blob: new Blob([pdfBytes], { type: 'application/pdf' }),
+    blob: new Blob([pdfBytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }),
     filename: `${file.name.split('.')[0]}.pdf`,
   };
 };

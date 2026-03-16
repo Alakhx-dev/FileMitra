@@ -1,41 +1,94 @@
-import React, { useState, useCallback } from 'react';
-import { useDropzone, Accept, DropzoneOptions } from 'react-dropzone';
-import { Upload, File, X, CheckCircle, Loader2, Download, ArrowRight } from 'lucide-react';
+import React, { useState, useRef, useCallback, DragEvent } from 'react';
+import { Upload, File as FileIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 
 interface FileUploaderProps {
   onFilesSelected: (files: File[]) => void;
-  accept?: Accept;
+  accept?: Record<string, string[]>;
   multiple?: boolean;
 }
+
+// Schedule work when the browser is idle, with a fallback for unsupported browsers
+const scheduleIdle = (cb: () => void) => {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(cb);
+  } else {
+    setTimeout(cb, 0);
+  }
+};
 
 export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, accept, multiple = true }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  // Generate image previews in idle time so it never blocks the main thread
+  const generatePreviews = useCallback((acceptedFiles: File[]) => {
+    acceptedFiles.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        scheduleIdle(() => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setPreviews(prev => [...prev, e.target?.result as string]);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    });
+  }, []);
+
+  // Handle files after selection — this runs AFTER the file picker closes
+  const handleFiles = useCallback((acceptedFiles: File[]) => {
     const newFiles = multiple ? [...files, ...acceptedFiles] : acceptedFiles;
     setFiles(newFiles);
     onFilesSelected(newFiles);
+    generatePreviews(acceptedFiles);
+  }, [files, multiple, onFilesSelected, generatePreviews]);
 
-    // Generate previews for images
-    acceptedFiles.forEach(file => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreviews(prev => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }, [files, multiple, onFilesSelected]);
+  // Click handler: ONLY opens the native file picker — zero other logic
+  const handleClick = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept,
-    multiple,
-  } as any);
+  // File input change: runs only AFTER user picks files
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      handleFiles(Array.from(selectedFiles));
+    }
+    // Reset so the same file can be re-selected
+    e.target.value = '';
+  }, [handleFiles]);
+
+  // Lightweight drag-and-drop handlers — only set a boolean flag, no heavy work
+  const handleDragEnter = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    const droppedFiles = e.dataTransfer?.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      handleFiles(Array.from(droppedFiles));
+    }
+  }, [handleFiles]);
 
   const removeFile = (index: number) => {
     const newFiles = files.filter((_, i) => i !== index);
@@ -44,10 +97,29 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, acc
     setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Build accept string for native input from the Accept record
+  const acceptString = accept
+    ? Object.entries(accept).flatMap(([mime, exts]: [string, string[]]) => [mime, ...exts]).join(',')
+    : undefined;
+
   return (
     <div className="w-full space-y-6">
+      {/* Hidden native file input — only thing that runs on click */}
+      <input
+        ref={inputRef}
+        type="file"
+        multiple={multiple}
+        accept={acceptString}
+        onChange={handleInputChange}
+        className="hidden"
+      />
+
       <div
-        {...getRootProps()}
+        onClick={handleClick}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
           "relative group cursor-pointer transition-all duration-700 overflow-hidden",
           "rounded-[32px] p-6 md:p-16 text-center",
@@ -79,7 +151,6 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, acc
           </svg>
         </div>
 
-        <input {...getInputProps()} />
         <div className="relative z-10 space-y-4 md:space-y-6">
           <motion.div 
             animate={isDragActive ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }}
@@ -125,7 +196,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, acc
                       <img src={previews[index]} alt="preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="p-2 md:p-3 bg-brand-primary/10 rounded-lg md:rounded-xl">
-                        <File className="w-4 h-4 md:w-6 md:h-6 text-brand-primary" />
+                        <FileIcon className="w-4 h-4 md:w-6 md:h-6 text-brand-primary" />
                       </div>
                     )}
                   </div>
