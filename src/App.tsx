@@ -604,6 +604,18 @@ const AppContent = () => {
               exit={{ opacity: 0, scale: 0.95 }}
               className="max-w-4xl mx-auto"
             >
+              <div className="mb-8 md:mb-12">
+                <button 
+                  onClick={() => { setStep('toolSelected'); setResult(null); setSelectedFiles([]); setOutputFormat(''); setOriginalFileSize(0); }}
+                  className="flex items-center text-muted-foreground hover:text-white transition-all font-bold text-base md:text-lg group"
+                >
+                  <div className="p-2 glass rounded-xl mr-3 md:mr-4 group-hover:-translate-x-2 transition-transform">
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 rotate-180" />
+                  </div>
+                  Back
+                </button>
+              </div>
+
               <div className="glass-card p-8 md:p-16 space-y-10 text-center">
                 <div className="mx-auto w-32 h-32 rounded-full bg-emerald-500/20 flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.2)]">
                   <CheckCircle2 className="w-16 h-16 text-emerald-500" />
