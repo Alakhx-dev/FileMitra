@@ -715,21 +715,23 @@ const AppContent = () => {
         </AnimatePresence>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 py-20 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-brand-primary" />
+      {/* Footer — Hidden during processing */}
+      {step !== 'processing' && (
+        <footer className="border-t border-white/10 py-20 px-6 relative z-10">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-brand-primary" />
+              </div>
+              <span className="text-2xl font-black tracking-tighter">File Mitra</span>
             </div>
-            <span className="text-2xl font-black tracking-tighter">File Mitra</span>
+            <p className="text-muted-foreground font-medium">© 2026 File Mitra – Your Smart File Assistant. All rights reserved.</p>
+            <div className="flex space-x-8">
+              <a href="#" className="text-muted-foreground hover:text-brand-primary transition-colors"><Github className="w-6 h-6" /></a>
+            </div>
           </div>
-          <p className="text-muted-foreground font-medium">© 2026 File Mitra – Your Smart File Assistant. All rights reserved.</p>
-          <div className="flex space-x-8">
-            <a href="#" className="text-muted-foreground hover:text-brand-primary transition-colors"><Github className="w-6 h-6" /></a>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 };
