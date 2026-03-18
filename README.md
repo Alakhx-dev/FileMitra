@@ -1,6 +1,6 @@
 # 🚀 File Mitra – Smart File Assistant
 
-🌐 Live Demo: https://filemitraa.vercel.app/
+🌐 Live Demo: https://filemitra.vercel.app/
 
 File Mitra is a modern, fast, and stylish web-based file utility tool that allows users to convert, merge, compress, and optimize files directly in the browser with a premium UI experience.
 
