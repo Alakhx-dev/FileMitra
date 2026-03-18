@@ -32,6 +32,7 @@ import {
   docxToPDF,
   createZip, 
   compressImageClient,
+  compressPDF,
   resizeImage,
   convertImage
 } from './fileUtils';
@@ -150,22 +151,30 @@ const AppContent = () => {
   const handleProcess = async (actionOverride?: ActionType) => {
     const action = actionOverride || activeAction;
     if (selectedFiles.length === 0) return;
-    
+
     setIsProcessing(true);
     setStep('processing');
-    
+
     try {
       let res;
+
       if (action === 'merge') {
         res = await mergeFiles(selectedFiles);
       } else if (action === 'compress') {
-        res = await compressImageClient(selectedFiles[0], quality);
+        const file = selectedFiles[0];
+        if (file.type === 'application/pdf') {
+          res = await compressPDF(file, quality);
+        } else if (file.type.startsWith('image/')) {
+          res = await compressImageClient(file, quality);
+        } else {
+          throw new Error(`Unsupported file type for compression: ${file.type}`);
+        }
       } else if (action === 'resize') {
-        res = await resizeImage(selectedFiles[0], 800, 600); // Default resize for now
+        res = await resizeImage(selectedFiles[0], 800, 600);
       } else if (action === 'convert') {
         const file = selectedFiles[0];
         const category = getFileCategory(file);
-        
+
         if (category === 'document' && outputFormat === 'PDF') {
           res = await docxToPDF(file);
         } else if (category === 'document' && outputFormat === 'TXT') {
@@ -183,21 +192,26 @@ const AppContent = () => {
           return;
         }
       }
-      
-      if (res) {
-        setResult(res);
-        setStep('result');
-        confetti({
-          particleCount: 150,
-          spread: 100,
-          origin: { y: 0.6 },
-          colors: ['#6366f1', '#a855f7', '#ec4899']
-        });
+
+      // IMPORTANT: Check for result before state update
+      if (!res) {
+        throw new Error('No result returned from processing');
       }
+
+      setResult(res);
+      setStep('result');
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.6 },
+        colors: ['#6366f1', '#a855f7', '#ec4899']
+      });
     } catch (error) {
-      console.error(error);
-      alert('Processing failed. Please try again.');
+      console.error('Processing error:', error);
+      // IMPORTANT: Always update UI on error
+      setIsProcessing(false);
       setStep('toolSelected');
+      alert(error instanceof Error ? error.message : 'Processing failed or took too long. Please try again.');
     } finally {
       setIsProcessing(false);
     }

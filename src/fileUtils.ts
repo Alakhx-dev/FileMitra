@@ -343,6 +343,132 @@ export const compressImageClient = async (file: File, sliderValue: number): Prom
   });
 };
 
+// Wrap PDF compression with timeout safety
+const compressWithTimeout = (
+  file: File,
+  sliderValue: number,
+  timeout: number = 15000
+): Promise<ProcessingResult> => {
+  return Promise.race([
+    compressPDFCore(file, sliderValue),
+    new Promise<ProcessingResult>((_, reject) =>
+      setTimeout(() => reject(new Error('PDF compression took too long (timeout)')), timeout)
+    ),
+  ]);
+};
+
+const compressPDFCore = async (file: File, sliderValue: number = 50): Promise<ProcessingResult> => {
+  // File size check: reject PDFs > 10MB
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('File too large (max 10MB for compression)');
+  }
+
+  const [{ PDFDocument }, pdfjsLib] = await Promise.all([
+    import('pdf-lib'),
+    import('pdfjs-dist'),
+  ]);
+
+  // Set up the PDF.js worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.mjs',
+    import.meta.url
+  ).toString();
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Slider = compression amount: higher slider → more compression → lower quality
+    // Slider 10 → quality 0.9, Slider 50 → 0.5, Slider 80 → 0.2
+    let jpegQuality = 1 - (sliderValue / 100);
+    jpegQuality = Math.max(0.1, Math.min(0.95, jpegQuality));
+
+    // Scale factor: reduce resolution for heavy compression (slider >= 60)
+    let scaleFactor = 1.5; // render at 1.5x for decent quality by default
+    if (sliderValue >= 60) {
+      // Scale from 1.5 down to 0.8 as slider goes 60→100
+      scaleFactor = 1.5 - ((sliderValue - 60) / 40) * 0.7;
+    }
+
+    console.log('Start compression');
+    console.log(`PDF Compression: slider=${sliderValue}, jpegQuality=${jpegQuality.toFixed(2)}, scaleFactor=${scaleFactor.toFixed(2)}`);
+    console.log('Original Size:', file.size);
+
+    // Load with pdfjs-dist for rendering
+    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdfDoc.numPages;
+
+    // Create a new PDF from compressed page images
+    const newPdf = await PDFDocument.create();
+
+    for (let i = 1; i <= numPages; i++) {
+      console.log(`Processing page: ${i}/${numPages}`);
+      const page = await pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale: scaleFactor });
+
+      // Render page to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context failed');
+
+      // CRITICAL: .promise must be awaited to ensure render completes
+      await page.render({ canvasContext: ctx, canvas, viewport } as any).promise;
+
+      // Convert canvas to compressed JPEG
+      const jpegDataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
+      const jpegBase64 = jpegDataUrl.split(',')[1];
+      const jpegBytes = Uint8Array.from(atob(jpegBase64), c => c.charCodeAt(0));
+      console.log(`Page ${i} image size: ${jpegBytes.length} bytes`);
+
+      // Embed the compressed image into the new PDF
+      const image = await newPdf.embedJpg(jpegBytes);
+
+      // Use original page dimensions (not scaled) so the PDF looks the same size
+      const origViewport = page.getViewport({ scale: 1 });
+      const newPage = newPdf.addPage([origViewport.width, origViewport.height]);
+      newPage.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: origViewport.width,
+        height: origViewport.height,
+      });
+    }
+
+    // Save the NEW pdf (not the original)
+    const compressedPdfBytes = await newPdf.save();
+    const compressedBlob = new Blob([compressedPdfBytes as Uint8Array<ArrayBuffer>], {
+      type: 'application/pdf',
+    });
+
+    console.log('Compressed Size:', compressedBlob.size);
+    console.log('Reduction:', Math.round((1 - compressedBlob.size / file.size) * 100) + '%');
+    console.log('Done');
+
+    // If compressed is larger or equal, return original
+    if (compressedBlob.size >= file.size) {
+      console.warn('Compressed PDF is not smaller, returning original');
+      return {
+        blob: file,
+        filename: file.name,
+      };
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    return {
+      blob: compressedBlob,
+      filename: `compressed_${baseName}.pdf`,
+    };
+  } catch (error) {
+    console.error('PDF Compression Error:', error);
+    throw error;
+  }
+};
+
+export const compressPDF = async (file: File, sliderValue: number = 50): Promise<ProcessingResult> => {
+  return compressWithTimeout(file, sliderValue);
+};
+
 export const resizeImage = async (file: File, width: number, height: number): Promise<ProcessingResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
