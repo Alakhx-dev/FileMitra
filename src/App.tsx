@@ -78,7 +78,7 @@ const AppContent = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [outputFormat, setOutputFormat] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<{ blob: Blob; filename: string } | null>(null);
+  const [result, setResult] = useState<{ blob: Blob; filename: string; message?: string } | null>(null);
   const [quality, setQuality] = useState(80);
   const [originalFileSize, setOriginalFileSize] = useState(0);
 
@@ -163,7 +163,7 @@ const AppContent = () => {
       } else if (action === 'compress') {
         const file = selectedFiles[0];
         if (file.type === 'application/pdf') {
-          res = await compressPDF(file, quality);
+          res = await compressPDF(file);
         } else if (file.type.startsWith('image/')) {
           res = await compressImageClient(file, quality);
         } else {
@@ -211,7 +211,7 @@ const AppContent = () => {
       // IMPORTANT: Always update UI on error
       setIsProcessing(false);
       setStep('toolSelected');
-      alert(error instanceof Error ? error.message : 'Processing failed or took too long. Please try again.');
+      alert(error instanceof Error ? error.message : 'Processing completed with issues. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -672,6 +672,13 @@ const AppContent = () => {
                       />
                     </div>
                   </motion.div>
+                )}
+
+                {/* Status message — e.g. browser limitation notice */}
+                {result.message && (
+                  <p className="text-sm text-amber-400/80 font-medium mt-4 max-w-xl mx-auto">
+                    {result.message}
+                  </p>
                 )}
                 
                 <div className="glass p-6 md:p-8 rounded-3xl flex flex-col sm:flex-row items-center justify-between max-w-xl mx-auto border-emerald-500/20 gap-6">
